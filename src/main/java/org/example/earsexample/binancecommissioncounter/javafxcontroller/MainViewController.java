@@ -4,7 +4,6 @@ import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.stage.Stage;
 import org.example.earsexample.binancecommissioncounter.service.BinanceApiCaller;
@@ -92,9 +91,7 @@ public class MainViewController {
                     progressLabel.setText(String.format("%.2f%%", progress * 100));
                     int remainingTime = (int) ((1 - progress) * 100);
                     progressLabel.setText(String.format("%.2f%% ~ %d s.", progress * 100, remainingTime));
-                }), commissionsInUSDT -> Platform.runLater(() -> {
-                    showAlert(Alert.AlertType.INFORMATION, "Commissions in USDT", "Commissions in USDT: " + commissionsInUSDT);
-                }));
+                }), commissionsInUSDT -> Platform.runLater(() -> showAlert(Alert.AlertType.INFORMATION, "Commissions in USDT", "Commissions in USDT: " + commissionsInUSDT)));
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     progressBarBox.setVisible(false);
