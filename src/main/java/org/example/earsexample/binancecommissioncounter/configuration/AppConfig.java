@@ -1,4 +1,4 @@
-package org.example.earsexample.binancecomissioncounter.configuration;
+package org.example.earsexample.binancecommissioncounter.configuration;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

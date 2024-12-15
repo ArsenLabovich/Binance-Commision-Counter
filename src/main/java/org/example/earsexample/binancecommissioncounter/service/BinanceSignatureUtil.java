@@ -1,4 +1,4 @@
-package org.example.earsexample.binancecomissioncounter.service;
+package org.example.earsexample.binancecommissioncounter.service;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -34,7 +34,8 @@ public class BinanceSignatureUtil {
             return hexString.toString();
 
         } catch (Exception e) {
-            throw new RuntimeException("Ошибка при подписании запроса", e);
+            System.out.println(e.getMessage());
+            throw new RuntimeException("Request Signature error", e);
         }
     }
 }

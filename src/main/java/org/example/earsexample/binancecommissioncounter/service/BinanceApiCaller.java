@@ -1,14 +1,12 @@
-package org.example.earsexample.binancecomissioncounter.service;
+package org.example.earsexample.binancecommissioncounter.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.converter.json.GsonBuilderUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -16,26 +14,39 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Scanner;
+import java.util.function.Consumer;
 
 @Component
-public class BinanceApiCaller implements CommandLineRunner {
+public class BinanceApiCaller {
 
     private final RestTemplate restTemplate;
+    private final UserCredentialsService userCredentialsService;
+    ObjectMapper mapper = new ObjectMapper();
 
-    public BinanceApiCaller(RestTemplate restTemplate) {
+    public BinanceApiCaller(RestTemplate restTemplate, UserCredentialsService userCredentialsService) {
         this.restTemplate = restTemplate;
+        this.userCredentialsService = userCredentialsService;
     }
 
     String exchangeInfoUrl = "https://api.binance.com/api/v3/exchangeInfo";
     String myTradesUrl = "https://api.binance.com/api/v3/myTrades";
-    String apiKey = "hQG6C0fDlyGm1XU2118JO2KbCDENXRtUHrUnjPuludvaDxkY5pKStJSTxEQNnuu8";
-    String secretKey = "1MPnRKWGSx8nbKp42Eoa94K6bWnQGskFtYUptT9l7SwElaqMkeIwQ1VbMIyTfRWl";
+    String tickerPriceUrl = "https://api.binance.com/api/v3/ticker/price";
+    String pingUrl = "https://api.binance.com/api/v3/ping";
+
+    public boolean checkConnection() {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.add("X-MBX-APIKEY", userCredentialsService.getApiKey());
+            HttpEntity<String> requestEntity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(pingUrl, HttpMethod.GET, requestEntity, String.class);
+            return response.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     private ArrayList<String> getSymbols() throws JsonProcessingException {
-
         String response = restTemplate.getForObject(exchangeInfoUrl, String.class);
-        ObjectMapper mapper = new ObjectMapper();
         JsonNode rootNode = mapper.readTree(response);
         JsonNode symbolsNode = rootNode.path("symbols");
         ArrayList<String> symbols = new ArrayList<>();
@@ -48,13 +59,24 @@ public class BinanceApiCaller implements CommandLineRunner {
         return symbols;
     }
 
-    @Override
-    public void run(String... args) throws Exception {
+    private Map<String, BigDecimal> covertCommissionsToUSDT(Map<String, BigDecimal> commissions) throws JsonProcessingException {
+        Map<String, BigDecimal> result = new HashMap<>();
+        result.put("USDT", commissions.get("USDT"));
+        commissions.remove("USDT");
+        for (String asset : commissions.keySet()) {
+            String symbol = asset + "USDT";
+            String url = tickerPriceUrl + "?symbol=" + symbol;
+            String response = restTemplate.getForObject(url, String.class);
+            JsonNode rootNode = mapper.readTree(response);
+            BigDecimal price = new BigDecimal(rootNode.path("price").asText());
+            BigDecimal commission = commissions.get(asset);
+            result.put("USDT", result.get("USDT").add(commission.multiply(price)));
+        }
+        return result;
+    }
+
+    public void runWithProgress(Consumer<Double> progressCallback, Consumer<Map<String, BigDecimal>> resultCallback) throws Exception {
         ArrayList<String> symbols = getSymbols();
-        System.out.println("Size: " + symbols.size());
-        Scanner sc = new Scanner(System.in);
-        System.out.println("Press any key to continue...");
-        sc.next();
         ArrayList<String> symbolsToCheck = new ArrayList<>();
         Map<String, BigDecimal> commissions = new HashMap<>();
         int totalSymbols = symbols.size();
@@ -65,46 +87,35 @@ public class BinanceApiCaller implements CommandLineRunner {
             params.put("recvWindow", "5000");
             params.put("timestamp", String.valueOf(System.currentTimeMillis()));
 
-            // Подписать запрос
-            String signature = BinanceSignatureUtil.signRequest(params, secretKey);
+            String signature = BinanceSignatureUtil.signRequest(params, userCredentialsService.getSecretKey());
             params.put("signature", signature);
 
-            // Собрать query string
             String queryString = params.entrySet().stream()
                     .map(entry -> entry.getKey() + "=" + entry.getValue())
                     .reduce((a, b) -> a + "&" + b)
                     .orElse("");
 
-            // Полный URL
             String url = myTradesUrl + "?" + queryString;
 
-            // Настроить заголовки
             HttpHeaders headers = new HttpHeaders();
-            headers.add("X-MBX-APIKEY", apiKey);
+            headers.add("X-MBX-APIKEY", userCredentialsService.getApiKey());
 
-            // Отправить запрос
-            RestTemplate restTemplate = new RestTemplate();
             HttpEntity<String> requestEntity = new HttpEntity<>(headers);
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, requestEntity, String.class);
-            ObjectMapper mapper = new ObjectMapper();
             if (!response.getBody().equals("[]")) {
                 symbolsToCheck.add(symbol);
                 JsonNode tradesNode = mapper.readTree(response.getBody());
                 for (JsonNode trade : tradesNode) {
                     String commissionAsset = trade.path("commissionAsset").asText();
                     BigDecimal commission = new BigDecimal(trade.path("commission").asText());
-                    if (commissions.containsKey(commissionAsset)) {
-                        commissions.put(commissionAsset, commissions.get(commissionAsset).add(commission));
-                    } else {
-                        commissions.put(commissionAsset, commission);
-                    }
+                    commissions.merge(commissionAsset, commission, BigDecimal::add);
                 }
             }
-            // Обновить прогресс
             processedSymbols++;
-            float progress = (float) (processedSymbols * 100) / totalSymbols;
-            System.out.printf("Progress: %.2f%%\n", progress);
+            double progress = (double) processedSymbols / totalSymbols;
+            progressCallback.accept(progress);
         }
-        System.out.println("Commissions:"+commissions);
+        Map<String, BigDecimal> commissionsInUSDT = covertCommissionsToUSDT(commissions);
+        resultCallback.accept(commissionsInUSDT);
     }
 }

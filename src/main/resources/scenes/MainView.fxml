@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<AnchorPane prefHeight="220.0" prefWidth="450.0" xmlns="http://javafx.com/javafx/17.0.2-ea" xmlns:fx="http://javafx.com/fxml/1" fx:controller="org.example.earsexample.binancecommissioncounter.javafxcontroller.MainViewController">
+    <VBox alignment="CENTER_LEFT" prefHeight="180.0" prefWidth="400.0" spacing="10.0" AnchorPane.bottomAnchor="20.0" AnchorPane.leftAnchor="25.0" AnchorPane.rightAnchor="25.0" AnchorPane.topAnchor="20.0">
+        <TextField fx:id="apiKeyField" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="30.0" prefWidth="250.0" promptText="Enter API Key" visible="false" />
+        <TextField fx:id="secretKeyField" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="30.0" prefWidth="250.0" promptText="Enter Secret Key" visible="false" />
+        <HBox fx:id="checkButtonBox" alignment="CENTER" prefHeight="40.0" prefWidth="360.0">
+            <Button onAction="#handleCheckConnectivity" prefHeight="26.0" prefWidth="160.0" style="-fx-background-color: black; -fx-font-weight: bold;" text="Check Connectivity" textFill="WHITE">
+                <font>
+                    <Font size="14.0" />
+                </font>
+          </Button>
+        </HBox>
+        <Button fx:id="seeCommissionsButton" onAction="#handleSubmit" style="-fx-background-color: black; -fx-font-weight: bold;" text="See Commissions" textFill="WHITE" visible="false" />
+        <HBox fx:id="progressBarBox" prefHeight="38.0" prefWidth="406.0" spacing="10.0" visible="false">
+            <ProgressBar fx:id="progressBar" prefWidth="300.0" />
+            <Label fx:id="progressLabel" />
+        </HBox>
+    </VBox>
+</AnchorPane>
